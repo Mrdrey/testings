@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Lingo Boost",
+    "slug": "translation",
+    "version": "1.0.1",
+    "android": {
+      "versionCode": 2
+    },
+    "splash": {
+      "image": "./assets/chatbot-logo.png",
+      "backgroundColor": "#0A3981"
+    },
+    "icon": "./assets/chatbot-logo.png",
+    "extra": {
+      "eas": {
+        "projectId": "9f0ba7cf-190e-4508-909e-c78d4633fb6d"
+      }
+    }
+  },
+  "android": {
+    "package": "com.example.translation"
+  }
+}
