@@ -272,7 +272,7 @@ const ChatbotScreen = () => {
 const handleUserInput = async () => {
   if (!inputText.trim()) return;
 
-  if (showIntro) setShowIntro(false); // Hide intro on first message
+  if (showIntro) setShowIntro(false);
 
   const newUserMessage = { sender: 'user', text: inputText };
   setMessages((prevMessages) => [...prevMessages, newUserMessage]);
@@ -280,25 +280,23 @@ const handleUserInput = async () => {
 
   // Define intents and their patterns
   const intents = [
-    // Greeting Intent
+    // Previous intents remain the same
     {
-        name: 'greeting',
-        pattern: /^(hello|hi|hey|greetings|good morning|good evening|good afternoon)/i,
-        handler: () => 'Hello! How can I assist you today?',
+      name: 'greeting',
+      pattern: /^(hello|hi|hey|greetings|good morning|good evening|good afternoon)/i,
+      handler: () => 'Hello! How can I assist you today?',
     },
-    // Help Intent
     {
-        name: 'help',
-        pattern: /^(help|what can you do|commands|features)/i,
-        handler: () => 'I can assist with translations. Try typing: "Translate \'apple\' to French". Supported languages: English, French, Spanish, and German.',
+      name: 'help',
+      pattern: /^(help|what can you do|commands|features)/i,
+      handler: () => 'I can assist with translations. Try typing: "Translate \'apple\' to French". Supported languages: English, French, Spanish, and German.',
     },
-    // Language Support Inquiry
     {
-        name: 'language_support',
-        pattern: /^(what languages do you support|supported languages|languages available|languages)/i,
-        handler: () => 'I support the following languages: English, French, Spanish, and German. Let me know if you’d like to translate something!',
+      name: 'language_support',
+      pattern: /^(what languages do you support|supported languages|languages available|languages)/i,
+      handler: () => 'I support the following languages: English, French, Spanish, and German. Let me know if you like to translate something!',
     },
-    // Translation Intent
+    // Enhanced translation intent with improved language detection
     {
       name: 'translate',
       pattern: /translate\s*['"]([^'"]+)['"] to (\w+)/i,
@@ -306,60 +304,121 @@ const handleUserInput = async () => {
         const wordToTranslate = match[1];
         const targetLanguage = match[2].toLowerCase();
 
-        let endpoint = null;
-        const languagePairs = {
-          'en-fr': ['english', 'french', 'en', 'fr'],
-          'en-es': ['english', 'spanish', 'en', 'es'],
-          'en-de': ['english', 'german', 'en', 'de'],
-          'fr-en': ['french', 'english', 'fr', 'en'],
-          'es-en': ['spanish', 'english', 'es', 'en'],
-          'de-en': ['german', 'english', 'de', 'en'],
+        // Expanded language mappings
+        const languageMap = {
+          // Full names
+          english: 'en',
+          french: 'fr',
+          spanish: 'es',
+          german: 'de',
+          // Codes
+          en: 'en',
+          fr: 'fr',
+          es: 'es',
+          de: 'de',
+          // Additional mappings for detection results
+          eng: 'en',
+          fra: 'fr',
+          fre: 'fr',
+          spa: 'es',
+          deu: 'de',
+          ger: 'de'
         };
 
-        // Find the appropriate language pair
-        let sourceLang = 'en'; // Default to English as source
-        for (const [pair, validLanguages] of Object.entries(languagePairs)) {
-          if (validLanguages.includes(targetLanguage)) {
-            endpoint = pair;
-            break;
-          }
-        }
-
-        if (!endpoint) {
-          return 'Sorry, I currently do not support that language pair. Supported languages: English, French, Spanish, and German.';
-        }
-
+        // Detect source language using language detection model
         try {
-          // Ensure you have the correct query and languageEndpoints
-          const response = await query(
+          // Use a more comprehensive language detection model
+          const detectionResponse = await query(
             { 
               inputs: wordToTranslate,
+              options: { wait_for_model: true }
+            },
+            'https://api-inference.huggingface.co/models/papluca/xlm-roberta-base-language-detection'
+          );
+
+          // Get the detected language with highest confidence
+          const detectionResult = Array.isArray(detectionResponse) ? 
+            detectionResponse[0] : 
+            detectionResponse;
+
+          let detectedLang;
+          if (detectionResult && Array.isArray(detectionResult)) {
+            // Sort by confidence and get the highest
+            const sortedResults = [...detectionResult].sort((a, b) => b.score - a.score);
+            detectedLang = sortedResults[0]?.label?.toLowerCase();
+          } else {
+            // Fallback if response format is different
+            detectedLang = detectionResult?.language?.toLowerCase() || 
+                          detectionResult?.detected_language?.toLowerCase();
+          }
+
+          // Map detected language to our supported codes
+          const sourceLang = languageMap[detectedLang] || detectedLang;
+          
+          // Get target language code
+          const targetLang = languageMap[targetLanguage];
+
+          if (!targetLang) {
+            return 'Sorry, I currently do not support that target language. Supported languages: English, French, Spanish, and German.';
+          }
+
+          if (!sourceLang || !languageMap[sourceLang]) {
+            return `Sorry, could not reliably detect the source language (detected: ${detectedLang}). Please try rephrasing your text.`;
+          }
+
+          // Create language pair endpoint
+          const endpoint = `${sourceLang}-${targetLang}`;
+
+          // Verify if we support this language pair
+          const supportedPairs = [
+            'en-fr', 'en-es', 'en-de',
+            'fr-en', 'es-en', 'de-en',
+            'fr-es', 'fr-de',
+            'es-fr', 'es-de',
+            'de-fr', 'de-es'
+          ];
+
+          if (!supportedPairs.includes(endpoint)) {
+            const sourceLangName = Object.keys(languageMap).find(key => languageMap[key] === sourceLang);
+            const targetLangName = Object.keys(languageMap).find(key => languageMap[key] === targetLang);
+            return `Sorry, translation from ${sourceLangName?.toUpperCase() || sourceLang.toUpperCase()} to ${targetLangName?.toUpperCase() || targetLang.toUpperCase()} is not supported.`;
+          }
+
+          // Perform translation
+          const response = await query(
+            {
+              inputs: wordToTranslate,
               source_lang: sourceLang,
-              target_lang: endpoint.split('-')[1]
-            }, 
+              target_lang: targetLang
+            },
             languageEndpoints[endpoint]
           );
 
-          // Extract translation from response
           const translation = 
             response.translation || 
             response[0]?.translation_text || 
             'Translation failed';
 
-          return `Translation of "${wordToTranslate}" to ${targetLanguage}: ${translation}`;
+          // Get full language names for display
+          const sourceLangName = Object.keys(languageMap)
+            .find(key => languageMap[key] === sourceLang && key.length > 2);
+          const targetLangName = Object.keys(languageMap)
+            .find(key => languageMap[key] === targetLang && key.length > 2);
+
+          return `Detected language: ${sourceLangName?.charAt(0).toUpperCase() + sourceLangName?.slice(1) || sourceLang.toUpperCase()}
+Translation of "${wordToTranslate}" to ${targetLangName || targetLanguage}: ${translation}`;
         } catch (error) {
-          return `Translation error: ${error.message}`;
+          console.error('Translation error:', error);
+          return `Translation error: Could not process the request. Please try again.`;
         }
       },
     },
-    // Goodbye Intent
     {
-        name: 'goodbye',
-        pattern: /^(goodbye|bye|see you|later|take care|farewell)/i,
-        handler: () => 'Goodbye! Have a great day!',
+      name: 'goodbye',
+      pattern: /^(goodbye|bye|see you|later|take care|farewell)/i,
+      handler: () => 'Goodbye! Have a great day!',
     },
-];
-
+  ];
 
   // Match inputText with intents
   let botResponse = 'I did not understand your request.';
@@ -376,11 +435,9 @@ const handleUserInput = async () => {
   setIsLoading(false);
   setInputText('');
 
-  // Update conversation history state
   const updatedHistory = [...conversationHistory, newUserMessage, newBotMessage];
   setConversationHistory(updatedHistory);
 };
-
 
   const startNewConversation = async () => {
     // Save the current conversation before resetting

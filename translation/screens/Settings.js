@@ -10,7 +10,9 @@ const lessons = [
   { id: '5', title: 'Lesson 5: Vocabulary Building' },
 
 ];
-
+const handleLessonPress=()=>{
+  router
+}
 const Settings = ({ navigation }) => {
 
   return (

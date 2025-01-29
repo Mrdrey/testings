@@ -1,0 +1,28 @@
+{
+	"folders": [
+		{
+			"name": "en-ja-translation",
+			"path": "../../../../en-ja-translation"
+		},
+		{
+			"name": "web",
+			"path": "../../../../../../xampp/htdocs/web"
+		},
+		{
+			"name": "websites",
+			"path": "../../.."
+		},
+		{
+			"path": "../../../../deploy"
+		},
+		{
+			"path": "../../../../my-app"
+		},
+		{
+			"path": "../../../../portfolio"
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "websites"
+	}
+}

@@ -76,7 +76,7 @@ export const ImageTranslate = () => {
 
     try {
       const response = await axios.post(
-        "https://js-server-tkk5.onrender.com/upload",
+        "http://192.168.100.153:5000/ocr_translate",
         formData,
         {
           headers: {
